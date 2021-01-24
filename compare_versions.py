@@ -2,8 +2,29 @@ import numpy as np
 import pandas as pd
 import sys
 import os
+import argparse
+import multiprocessing as mp
 
 print("\n")
+
+# Setting up argparse
+parser = argparse.ArgumentParser(description="Calculate differences between between identified phenotypes and genes "
+                                             "to help compare PathFX versions")
+
+command_group_optional_args = parser.add_mutually_exclusive_group()
+command_group_optional_args.add_argument('-d', '--drugs', metavar='drug_list', type=str, nargs='+',
+                                         help='List of drugs to compare with PathFX versions. Compares '
+                                              'genes by default. Use --phenotypes to compare with phenotypes.')
+command_group_optional_args.add_argument('-r', '--random-drugs', metavar="n_drugs", type=int,
+                                         help='Number of drugs to randomly compare')
+parser.add_argument('-p', '--phenotypes', help='Compares PathFX using the amount of phenotypes it identifies',
+                    action='store_true')
+
+if len(sys.argv) == 1:
+    parser.print_help(sys.stderr)
+    sys.exit(1)
+
+args = parser.parse_args()
 
 
 # Returns how many more genes v2 identified than v1
@@ -148,7 +169,7 @@ def read_paths():
     return [locs[0].strip(), locs[1].strip()]
 
 
-def compare_n_genes(num_of_drugs):
+def compare_n_drugs(num_of_drugs):
     paths = read_paths()
 
     # Path to database of all drugs
@@ -173,7 +194,6 @@ def compare_n_genes(num_of_drugs):
 
     # Run analyses on the randomly selected drugs
     for drug in random_drugs.drug_id:
-
         # Change working dir so the script can find its resources
         os.chdir(paths[0])
         os.system("python3 phenotype_enrichment_pathway.py -d " + drug +
@@ -193,11 +213,9 @@ def compare_n_genes(num_of_drugs):
     # Number will be negative if v1 identified more genes
     gene_diff = 0
 
-
-
     for drug in random_drugs.drug_id:
         v1db = paths[0][0:len(paths) - 10] + "/results/pathfx_analysis/" + drug + "/" + drug + \
-            "_merged_neighborhood__assoc_database_sources_.txt"
+               "_merged_neighborhood__assoc_database_sources_.txt"
 
         v2db = paths[1][0:len(paths) - 10] + "/results/pathfx_analysis/" + drug + "/" + drug + \
             "_merged_neighborhood__assoc_database_sources_.txt"
@@ -226,16 +244,19 @@ def compare_n_genes(num_of_drugs):
     return gene_diff
 
 
-if len(sys.argv) == 1:
-    compare_one_drug("", "")
+if args.random_drugs:
+    compare_n_drugs(args.random_drugs)
 
-if len(sys.argv) == 2:
-    try:
-        # Make sure arg is a number
-        compare_n_genes(int(sys.argv[1]))
+# if len(sys.argv) == 1:
+#    compare_one_drug("", "")
 
-    except ValueError:
-        print("Please enter a number as the argument.\n")
+# if len(sys.argv) == 2:
+#    try:
+#        # Make sure arg is a number
+#        compare_n_genes(int(sys.argv[1]))
 
-if len(sys.argv) == 3:
-    compare_one_drug(sys.argv[1], sys.argv[2])
+#    except ValueError:
+#        print("Please enter a number as the argument.\n")
+
+# if len(sys.argv) == 3:
+#    compare_one_drug(sys.argv[1], sys.argv[2])
