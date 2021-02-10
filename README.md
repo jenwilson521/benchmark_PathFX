@@ -27,7 +27,7 @@ Example output for running `python compare_versions.py -d metformin 'Quinidine b
 
 ### Compare random drugs (--random-drugs)
 
-To compare random drugs use --random-drugs or -r and then a number. Example usage: `python compare_versions.py -r 2` will compare 2 randomly selected drugs.
+To compare random drugs use --random-drugs or -r and then a number. Example usage: `python compare_versions.py -r 2` will compare 2 randomly selected drugs. Genes are compared by default.
 
 - If only one drug is compared, data about the frequency of each gene/phenotype/gene with associated phenotype will be displayed, otherwise the script will find the average of how many more genes/phenotypes/gene with associated phenotypes that PathFX v2 found.
 
@@ -46,6 +46,7 @@ Example with `python compare_versions.py -d metformin -csp "lipoprotein(a)"`:
 - genes are compared by default
 - to compare phenotypes use --phenotypes or -p. For example: `python compare_versions.py -d metformin -p`
 - to compare genes with associated phenotypes use --genes-with-phenotype or -gwp. For example: `python compare_versions.py -d metformin -gwp`
+- -p and -gwp can be used with --drugs and --random-drugs
 
 ### Used cached analyses (--cache)
 
