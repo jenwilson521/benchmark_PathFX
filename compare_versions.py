@@ -344,15 +344,15 @@ def compare_n_drugs(num_of_drugs=-1, drug_list=None, compare_with_phen=False, co
     drug_db_merged = [drug_in_list for drug_in_list in drug_db_merged if "(" not in drug_in_list]
     drug_db_merged = [drug_in_list for drug_in_list in drug_db_merged if ")" not in drug_in_list]
 
-    # Remove drugs with spaces because v2 seems to be buggy with them
-    drug_db_merged = [drug_in_list for drug_in_list in drug_db_merged if " " not in drug_in_list]
-
     for drug in drug_db_merged:
         if "/" in drug:
             print(drug)
 
     if len(drug_list) == 0:
         # Select n drugs randomly
+        # Remove drugs with spaces because v2 seems to be buggy with them
+        drug_db_merged = [drug_in_list for drug_in_list in drug_db_merged if " " not in drug_in_list]
+
         drug_list = sample(drug_db_merged, num_of_drugs)
 
     # Validate passed in drug list
