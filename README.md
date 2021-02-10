@@ -32,13 +32,14 @@ To compare random drugs use --random-drugs or -r and then a number. Example usag
 - If only one drug is compared, data about the frequency of each gene/phenotype/gene with associated phenotype will be displayed, otherwise the script will find the average of how many more genes/phenotypes/gene with associated phenotypes that PathFX v2 found.
 
 Example output for running `python compare_versions.py -r 5`:
+![Comparing 5 randomly selected drugs](readme_images/5_random_drugs.png)
 
 ### Compare specific phenotypes (--compare-specific-phenotypes)
 
 To compare a single drug while looking at specific phenotypes use --compare-specific-phenotypes or -csp. You can look at as many phenotypes as you want, just put them in a space sperated list. Needs to also be used with --drugs or --random-drugs. --csp will be ignored if it's used with more than one drug. Example usage: `python compare_versions.py -d metformin -csp "lipoprotein(a)"` or `python compare_versions.py -d metformin -csp "lipoprotein(a)" "hereditary hemochromatosis"`. Note that phenotype names need to be in quotes if they contain any special characters like spaces or parentheses. 
 
 Example with `python compare_versions.py -d metformin -csp "lipoprotein(a)"`: 
-![comparing PathFX looking only at lipoprotein(a) identification](readme_images/5_random_drugs.png)
+![comparing PathFX looking only at lipoprotein(a) identification](readme_images/csp.png)
 
 ### Compare different data
 
