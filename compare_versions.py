@@ -5,9 +5,9 @@ import sys
 import os
 import argparse
 from multiprocessing import Pool
-
-# Dictates how many data points to show for the most common points when only doing one drug
-top_data = 10
+import pickle
+from random import sample
+import shutil
 
 print("\n")
 
@@ -17,11 +17,11 @@ parser = argparse.ArgumentParser(description="Calculate differences between betw
 
 command_group_optional_args = parser.add_mutually_exclusive_group()
 command_group_optional_args_analysis = parser.add_mutually_exclusive_group()
-command_group_optional_args.add_argument('-d', '--drugs', metavar='drug_list', type=str, nargs='+',
-                                         help='List of drugs to compare with PathFX versions. Compares '
-                                              'genes by default. Use --phenotypes or --genes-with-phenotype to change '
-                                              'this.')
-command_group_optional_args.add_argument('-r', '--random-drugs', metavar="n_drugs", type=int,
+command_group_optional_args.add_argument('-d', '--drugs', metavar='drug1', type=str, nargs='+',
+                                         help='List of drugs to compare with PathFX versions. Use quotes if a drug is '
+                                              'multiple words. Compares genes by default. Use --phenotypes or '
+                                              '--genes-with-phenotype to change this.')
+command_group_optional_args.add_argument('-r', '--random-drugs', metavar="n", type=int,
                                          help='Number of drugs to randomly compare. Compares genes by default. Use '
                                               '--phenotypes or --genes-with-phenotype to change this.')
 command_group_optional_args_analysis.add_argument('-p', '--phenotypes', help='Compares PathFX using the amount of '
@@ -29,17 +29,29 @@ command_group_optional_args_analysis.add_argument('-p', '--phenotypes', help='Co
                                                   action='store_true')
 command_group_optional_args_analysis.add_argument('-gwp', '--genes-with-phenotype',
                                                   help='Compares PathFX using only genes that have an associated '
-                                                       'phenotype',
-                                                  action='store_true')
-
+                                                       'phenotype', action='store_true')
+command_group_optional_args_analysis.add_argument('-csp', '--compare-specific-phenotypes', metavar='phenotype1',
+                                                  help='Compares output of PathFX by looking at specific phenotypes. '
+                                                       'Use quotes if the phenotype is multiple words, or if the '
+                                                       'phenotype has parenthesis or brackets in the name. Must be used'
+                                                       ' with --drugs.', type=str, nargs='+')
 parser.add_argument('-c', '--cache', help='Use already completed analysis if a previously analyzed drug is analyzed '
                                           'again', action='store_true')
+parser.add_argument('-t', '--top-amount', metavar="num", type=int,
+                    help='Number of output items to display. Defaults to 10. Use when only '
+                         'comparing one drug')
 
 if len(sys.argv) == 1:
     parser.print_help(sys.stderr)
     sys.exit(1)
 
 args = parser.parse_args()
+
+# Dictates how many data points to show for the most common points when only doing one drug
+if args.top_amount is None:
+    top_data = 10
+else:
+    top_data = args.top_amount
 
 
 # Returns how many more genes v2 identified than v1
@@ -107,12 +119,40 @@ def compare_one_drug(v1db, v2db, drug_list, print_stuff=True):
         v1_data = data_frame_v1.drop_duplicates(subset=['phenotype']).shape[0]
         v2_data = data_frame_v2.drop_duplicates(subset=['phenotype']).shape[0]
 
-        # Print top 10 most common data points
+        data_frame_v1['phenotype'] = data_frame_v1['phenotype'].str.lower()
+        data_frame_v2['phenotype'] = data_frame_v2['phenotype'].str.lower()
+
+        # Print top 10 most common data points if only comparing one drug
         if len(drug_list) == 1:
-            print("\nv1 top 10 most common phenotypes\n")
-            print(data_frame_v1['phenotype'].value_counts()[:top_data])
-            print("\n\nv2 top 10 most common phenotypes\n")
-            print(data_frame_v2['phenotype'].value_counts()[:top_data])
+            if args.compare_specific_phenotypes is None:
+                print("\nv1 top 10 most common phenotypes\n")
+                print(data_frame_v1['phenotype'].value_counts()[:top_data])
+                print("\n\nv2 top 10 most common phenotypes\n")
+                print(data_frame_v2['phenotype'].value_counts()[:top_data])
+
+            # -csp is used
+            else:
+                print("\nOccurrences of: " + str(args.compare_specific_phenotypes))
+
+                # v1 results first
+                print("\nPathFXv1:")
+                for phen in args.compare_specific_phenotypes:
+                    try:
+                        print(phen + ": " + str(data_frame_v1['phenotype'].value_counts()[phen.lower()]))
+                    # Data point doesn't exist
+                    except KeyError:
+                        print(phen + ": 0")
+
+                # v2 results next
+                print("\n\nPathFXv2:")
+                for phen in args.compare_specific_phenotypes:
+                    try:
+                        print(phen + ": " + str(data_frame_v2['phenotype'].value_counts()[phen.lower()]))
+                    # Data point doesn't exist
+                    except KeyError:
+                        print(phen + ": 0")
+                # v2 results next
+                print("\n")
 
     # Genes
     elif "_merged_neighborhood_.txt" in v1db:
@@ -224,6 +264,10 @@ def read_paths():
         f = open('pathfx_locs.txt', 'w')
         f.write(locs[0].strip() + "\n" + locs[1])
 
+    # band aid fix for read_paths() returning ["",""] instead of the paths when first creating the config
+    if [locs[0].strip(), locs[1].strip()] == ["", ""]:
+        return read_paths()
+
     return [locs[0].strip(), locs[1].strip()]
 
 
@@ -233,15 +277,15 @@ def run_analysis_v1(paths_in, drug_in):
     os.chdir(paths_in[0])
 
     # Folder already exists
-    if args.cache and os.path.isdir(paths_in[0] + "/../results/pathfx_analysis/" + drug_in):
+    if args.cache and os.path.isdir(paths_in[0] + "/../results/pathfx_analysis/" + drug_in.replace(" ", "")):
         # check if text files are there
-        files = '\t'.join(os.listdir(paths_in[0] + "/../results/pathfx_analysis/"+drug_in))
+        files = '\t'.join(os.listdir(paths_in[0] + "/../results/pathfx_analysis/" + drug_in.replace(" ", "")))
         if "_merged_neighborhood_.txt" in files and "_merged_neighborhood__assoc_table_.txt" in files and \
                 "_merged_neighborhood__assoc_database_sources_.txt" in files:
             return
 
-    os.system("python3 phenotype_enrichment_pathway.py -d " + drug_in +
-              " -a PathFX_analysis")
+    os.system("python3 phenotype_enrichment_pathway.py -d '" + drug_in +
+              "' -a PathFX_analysis")
     # print("\n\n" + str(prog) + " out of " + str(num_of_drugs) + "\n")
 
 
@@ -250,15 +294,15 @@ def run_analysis_v2(paths_in, drug_in):
     os.chdir(paths_in[1])
 
     # Folder already exists
-    if args.cache and os.path.isdir(paths_in[1] + "/../results/pathfx_analysis/" + drug_in):
+    if args.cache and os.path.isdir(paths_in[1] + "/../results/pathfx_analysis/" + drug_in.replace(" ", "")):
         # check if text files are there
-        files = '\t'.join(os.listdir(paths_in[0] + "/../results/pathfx_analysis/"+drug_in))
+        files = '\t'.join(os.listdir(paths_in[1] + "/../results/pathfx_analysis/" + drug_in.replace(" ", "")))
         if "_merged_neighborhood_.txt" in files and "_merged_neighborhood__assoc_table_.txt" in files and \
                 "_merged_neighborhood__assoc_database_sources_.txt" in files:
             return
 
-    os.system("python3 phenotype_enrichment_pathway.py -d " + drug_in +
-              " -a PathFX_analysis")
+    os.system("python3 phenotype_enrichment_pathway.py -d '" + drug_in +
+              "' -a PathFX_analysis")
 
     # print("\n\n" + str(prog) + " out of " + str(num_of_drugs) + "\n")
 
@@ -270,27 +314,59 @@ def compare_n_drugs(num_of_drugs=-1, drug_list=None, compare_with_phen=False, co
 
     paths = read_paths()
 
-    # Path to database of all drugs
-    drug_db_path = paths[1][0:len(paths) - 10] + "/rscs/repoDB_082117.txt"
+    # Path to database of all drugs for v1
+    drug_db_path_v1 = paths[0][0:len(paths) - 10] + "/rscs/drug_intome_targets.pkl"
+
+    # Path to database of all drugs for v2
+    drug_db_path_v2 = paths[1][0:len(paths) - 10] + "/rscs/drug_intome_targets.pkl"
     # Read into data frame with pandas
-    drug_db = pd.read_csv(drug_db_path)
+
+    pkl_v1 = open(drug_db_path_v1, 'rb')
+    pkl_v2 = open(drug_db_path_v2, 'rb')
+
+    drub_db_dict_v1 = pickle.load(pkl_v1)
+
+    # Remove keys that have no data. Only needs to be done for one dict because the intersection is of both DB's
+    # are taken after.
+    filtered = {k: v for k, v in drub_db_dict_v1.items() if len(v) is not 0}
+    drub_db_dict_v1.clear()
+    drub_db_dict_v1.update(filtered)
+
+    drug_db_list_v1 = drub_db_dict_v1.keys()
+    drug_db_list_v2 = list(pickle.load(pkl_v2))
+
+    drug_db_merged = list(set(drug_db_list_v1) & set(drug_db_list_v2))
+
+    # Sanitize names
+    drug_db_merged = [drug_in_list for drug_in_list in drug_db_merged if "/" not in drug_in_list]
+    drug_db_merged = [drug_in_list for drug_in_list in drug_db_merged if "[" not in drug_in_list]
+    drug_db_merged = [drug_in_list for drug_in_list in drug_db_merged if "]" not in drug_in_list]
+    drug_db_merged = [drug_in_list for drug_in_list in drug_db_merged if "(" not in drug_in_list]
+    drug_db_merged = [drug_in_list for drug_in_list in drug_db_merged if ")" not in drug_in_list]
+
+    # Remove drugs with spaces because v2 seems to be buggy with them
+    drug_db_merged = [drug_in_list for drug_in_list in drug_db_merged if " " not in drug_in_list]
+
+    for drug in drug_db_merged:
+        if "/" in drug:
+            print(drug)
 
     if len(drug_list) == 0:
         # Select n drugs randomly
-        random_drugs = drug_db.sample(n=num_of_drugs)
-
-        drug_list = random_drugs.drug_id
+        drug_list = sample(drug_db_merged, num_of_drugs)
 
     # Validate passed in drug list
     else:
         for drug in drug_list:
-            if (drug.upper() not in drug_db.drug_id.values) and (drug.title() not in drug_db.drug_name.values):
+            if drug.upper() not in map(str.upper, drug_db_merged):
                 print(drug + " is not a valid drug.")
                 sys.exit(1)
-            num_of_drugs = len(drug_list)
+        num_of_drugs = len(drug_list)
 
     # Save original working dir before changing it
     ogwd = os.getcwd()
+
+    print("\n\n\nOutput from PathFX:\n")
 
     # Run analyses on the randomly selected drugs
     with Pool(20) as pool:
@@ -301,11 +377,15 @@ def compare_n_drugs(num_of_drugs=-1, drug_list=None, compare_with_phen=False, co
         pool.close()
         pool.join()
 
+    print("\n\n\n" + "-" * shutil.get_terminal_size().columns)
+
+    print("\nComparison output:\n")
+
     # Set working dir back to original dir
     os.chdir(ogwd)
 
     # Compares the output depending on the commandline argument
-    if compare_with_phen:
+    if compare_with_phen or args.compare_specific_phenotypes is not None:
         gene_diff = compare_with_phenotypes(drug_list, paths)
         output_comparison = " more phenotypes"
     elif compare_gwp:
@@ -342,11 +422,11 @@ def compare_with_genes(drug_list, paths):
     gene_diff = 0
 
     for drug in drug_list:
-        v1db = paths[0][0:len(paths) - 10] + "/results/pathfx_analysis/" + drug + "/" + drug + \
-               "_merged_neighborhood_.txt"
+        v1db = paths[0][0:len(paths) - 10] + "/results/pathfx_analysis/" + drug.replace(" ", "") + "/" + \
+               drug.replace(" ", "") + "_merged_neighborhood_.txt"
 
-        v2db = paths[1][0:len(paths) - 10] + "/results/pathfx_analysis/" + drug + "/" + drug + \
-            "_merged_neighborhood_.txt"
+        v2db = paths[1][0:len(paths) - 10] + "/results/pathfx_analysis/" + drug.replace(" ", "") + "/" + \
+               drug.replace(" ", "") + "_merged_neighborhood_.txt"
 
         gene_diff += compare_one_drug(v1db, v2db, drug_list, print_stuff=False)
 
@@ -357,11 +437,11 @@ def compare_with_phenotypes(drug_list, paths):
     gene_diff = 0
 
     for drug in drug_list:
-        v1db = paths[0][0:len(paths) - 10] + "/results/pathfx_analysis/" + drug + "/" + drug + \
-               "_merged_neighborhood__assoc_table_.txt"
+        v1db = paths[0][0:len(paths) - 10] + "/results/pathfx_analysis/" + drug.replace(" ", "") + "/" + \
+               drug.replace(" ", "") + "_merged_neighborhood__assoc_table_.txt"
 
-        v2db = paths[1][0:len(paths) - 10] + "/results/pathfx_analysis/" + drug + "/" + drug + \
-            "_merged_neighborhood__assoc_table_.txt"
+        v2db = paths[1][0:len(paths) - 10] + "/results/pathfx_analysis/" + drug.replace(" ", "") + "/" + \
+               drug.replace(" ", "") + "_merged_neighborhood__assoc_table_.txt"
 
         gene_diff += compare_one_drug(v1db, v2db, drug_list, print_stuff=False)
 
@@ -375,11 +455,11 @@ def compare_with_genes_with_phenotypes(drug_list, paths):
     gene_diff = 0
 
     for drug in drug_list:
-        v1db = paths[0][0:len(paths) - 10] + "/results/pathfx_analysis/" + drug + "/" + drug + \
-               "_merged_neighborhood__assoc_database_sources_.txt"
+        v1db = paths[0][0:len(paths) - 10] + "/results/pathfx_analysis/" + drug.replace(" ", "") + "/" + \
+               drug.replace(" ", "") + "_merged_neighborhood__assoc_database_sources_.txt"
 
-        v2db = paths[1][0:len(paths) - 10] + "/results/pathfx_analysis/" + drug + "/" + drug + \
-            "_merged_neighborhood__assoc_database_sources_.txt"
+        v2db = paths[1][0:len(paths) - 10] + "/results/pathfx_analysis/" + drug.replace(" ", "") + "/" + \
+               drug.replace(" ", "") + "_merged_neighborhood__assoc_database_sources_.txt"
 
         gene_diff += compare_one_drug(v1db, v2db, drug_list, print_stuff=False)
 
