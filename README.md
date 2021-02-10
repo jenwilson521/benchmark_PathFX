@@ -15,32 +15,34 @@ Running the script with no arguments or -h will give an overview of each of the 
 
 ### Compare specific drugs (--drugs)
 
-Running compare_versions.py with -d or --drugs and then a space seperated list of drugs will compare PathFX versions using the amount of genes each version identifies. It compares genes by default. For multi-word drugs put it in quotes. Examples: `python compare_versions.py -d metformin` and `python compare_versions.py -d metformin 'Quinidine barbiturate'`
+Running compare_versions.py with -d or --drugs, and then a space seperated list of drugs will compare PathFX versions using the amount of genes each version identifies. It compares genes by default. For multi-word drugs put it in quotes. Examples: `python compare_versions.py -d metformin` and `python compare_versions.py -d metformin 'Quinidine barbiturate'`
 
 - If only one drug is compared, data about the frequency of each gene/phenotype/gene with associated phenotype will be displayed, otherwise the script will find the average of how many more genes/phenotypes/gene with associated phenotypes that PathFX v2 found.
 
 Example output for running `python compare_versions.py -d metformin`:
-
+![comparing PathFX with metformin](readme_images/comparing_metformin.png)
 
 Example output for running `python compare_versions.py -d metformin 'Quinidine barbiturate'`:
+![comparing PathFX with metformin and quinidine barbiturate](readme_images/metformin_and_Quinidine_barbiturate.png)
 
 ### Compare random drugs (--random-drugs)
 
-To compare random drugs use --random-drugs or -r and then a number. Example usage: `python compare_versions.py -r 2` will compare 2 random drugs.
+To compare random drugs use --random-drugs or -r and then a number. Example usage: `python compare_versions.py -r 2` will compare 2 randomly selected drugs.
 
 - If only one drug is compared, data about the frequency of each gene/phenotype/gene with associated phenotype will be displayed, otherwise the script will find the average of how many more genes/phenotypes/gene with associated phenotypes that PathFX v2 found.
 
 ### Compare specific phenotypes (--compare-specific-phenotypes)
 
-To compare a single drug while looking at specific phenotypes use --compare-specific-phenotypes or -csp. Needs to also be used with --drugs. Example usage: `python compare_versions.py -d metformin -csp "lipoprotein(a)"`. Note that phenotype names need to be in quotes if they contain any special characters like spaces or parentheses. 
+To compare a single drug while looking at specific phenotypes use --compare-specific-phenotypes or -csp. You can look at as many phenotypes as you want, just put them in a space sperated list. Needs to also be used with --drugs or --random-drugs. --csp will be ignored if it's used with more than one drug. Example usage: `python compare_versions.py -d metformin -csp "lipoprotein(a)"` or `python compare_versions.py -d metformin -csp "lipoprotein(a)" "hereditary hemochromatosis"`. Note that phenotype names need to be in quotes if they contain any special characters like spaces or parentheses. 
 
 Example with `python compare_versions.py -d metformin -csp "lipoprotein(a)"`: 
+![comparing PathFX looking only at lipoprotein(a) identification](readme_images/csp.png)
 
 ### Compare different data
 
 - genes are compared by default
-- to compare phenotypes use --phenotypes or -p
-- to compare genes with associated phenotypes use --genes-with-phenotype or -gwp
+- to compare phenotypes use --phenotypes or -p. For example: `python compare_versions.py -d metformin -p`
+- to compare genes with associated phenotypes use --genes-with-phenotype or -gwp. For example: `python compare_versions.py -d metformin -gwp`
 
 ### Used cached analyses (--cache)
 
@@ -48,5 +50,5 @@ If you know you have already analyzed a drug you can use --cache or -c to use th
 
 ### Top amount (--top-amount)
 
-When comparing a single drug by default only the top 10 most frequent genes/phenotypes/genes with associated phenotypes will be displayed. To change this you can run --top-amount or -t and then the amount of data you want to display. Example: `python compare_versions.py -d metformin -t 20` will display the top 20 most frequent genes.
+When comparing a single drug by default only the top 10 most frequent genes/phenotypes/genes with associated phenotypes will be displayed. To change this you can use --top-amount or -t and then the amount of data you want to display. Example: `python compare_versions.py -d metformin -t 20` will display the top 20 most frequent genes instead of the top 10.
 
