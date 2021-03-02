@@ -8,6 +8,7 @@ from multiprocessing import Pool
 import pickle
 from random import sample
 import shutil
+from pathlib import Path
 
 print("\n")
 
@@ -33,7 +34,8 @@ command_group_optional_args_analysis.add_argument('-gwp', '--genes-with-phenotyp
 command_group_optional_args_analysis.add_argument('-csp', '--compare-specific-phenotypes', metavar='phenotype1',
                                                   help='Compares output of PathFX by looking at specific phenotypes. '
                                                        'Use quotes if the phenotype is multiple words, or if the '
-                                                       'phenotype has parenthesis or brackets in the name. Must be used'
+                                                       'phenotype has parenthesis or brackets in the name. You can '
+                                                       'also uses the phenotype\'s CUI. Must be used '
                                                        ' with --drugs.', type=str, nargs='+')
 parser.add_argument('-c', '--cache', help='Use already completed analysis if a previously analyzed drug is analyzed '
                                           'again', action='store_true')
@@ -52,6 +54,137 @@ if args.top_amount is None:
     top_data = 10
 else:
     top_data = args.top_amount
+
+
+# Get the diffs between the cui's for one drug
+def cui_diffs(drug, print_stuff=True):
+    paths = [read_paths()[0], read_paths()[1]]
+    paths[0] = paths[0][
+               :-7] + "results/pathfx_analysis/" + drug + "/" + drug + "_merged_neighborhood__assoc_table_.txt"
+    paths[1] = paths[1][
+               :-7] + "results/pathfx_analysis/" + drug + "/" + drug + "_merged_neighborhood__assoc_table_.txt"
+
+    data_frame_v1 = pd.read_csv(paths[0], delimiter="\t", index_col=False)
+    data_frame_v2 = pd.read_csv(paths[1], delimiter="\t", index_col=False)
+
+    data_intersection = pd.merge(data_frame_v1, data_frame_v2, how="inner", on=['cui'])
+
+    data_only_v1 = data_frame_v1.merge(data_frame_v2, indicator=True, how='left', on='cui').loc[lambda x: x['_merge'] != 'both']
+    data_only_v2 = data_frame_v2.merge(data_frame_v1, indicator=True, how='left', on='cui').loc[lambda x: x['_merge'] != 'both']
+
+    data_only_v1 = data_only_v1.reset_index(drop=True)
+    data_only_v2 = data_only_v2.reset_index(drop=True)
+
+    if print_stuff:
+        print("\n\n" + drug + "'s unique CUI's for v1\n")
+
+        print(data_only_v1.cui[:top_data])
+
+        print("\n\n" + drug + "'s unique CUI's for v2\n")
+        print(data_only_v2.cui[:top_data])
+
+        print("\n\n" + drug + "'s common CUI's between v1 and v2\n")
+        print(data_intersection.cui[:top_data])
+
+        print("\n")
+
+    return [data_only_v1, data_only_v2, data_intersection]
+
+
+# Gets all the genes ready to export
+def prepare_genes(drug):
+    paths = [read_paths()[0], read_paths()[1]]
+    paths[0] = paths[0][
+               :-7] + "results/pathfx_analysis/" + drug + "/" + drug + "_merged_neighborhood_.txt"
+    paths[1] = paths[1][
+               :-7] + "results/pathfx_analysis/" + drug + "/" + drug + "_merged_neighborhood_.txt"
+
+    data_frame_v1 = pd.read_csv(paths[0], delimiter="\t", index_col=False, names=['Gene', 'col2', 'col3'])
+    data_frame_v2 = pd.read_csv(paths[1], delimiter="\t", index_col=False, names=['Gene', 'col2', 'col3'])
+
+    v1_dedup = data_frame_v1.drop_duplicates(subset=['Gene'])
+    v2_dedup = data_frame_v2.drop_duplicates(subset=['Gene'])
+
+    data_frame_v1 = data_frame_v1['Gene'].value_counts()
+    data_frame_v2 = data_frame_v2['Gene'].value_counts()
+
+    data_intersection = pd.merge(v1_dedup, v2_dedup, how="inner", on=['Gene'])
+
+    data_only_v1 = v1_dedup.merge(v2_dedup, indicator=True, how='left', on='Gene').loc[
+        lambda x: x['_merge'] != 'both']
+    data_only_v2 = v2_dedup.merge(v1_dedup, indicator=True, how='left', on='Gene').loc[
+        lambda x: x['_merge'] != 'both']
+
+    data_only_v1 = data_only_v1.reset_index(drop=True)
+    data_only_v2 = data_only_v2.reset_index(drop=True)
+
+    return [data_frame_v1, data_frame_v2, data_only_v1, data_only_v2, data_intersection]
+
+
+def print_cuis(drug_list):
+    # Print CUI's of each drug
+    print("\n")
+
+    for drug in drug_list:
+        paths = [read_paths()[0], read_paths()[1]]
+        paths[0] = paths[0][
+                   :-7] + "results/pathfx_analysis/" + drug + "/" + drug + "_merged_neighborhood__assoc_table_.txt"
+        paths[1] = paths[1][
+                   :-7] + "results/pathfx_analysis/" + drug + "/" + drug + "_merged_neighborhood__assoc_table_.txt"
+
+        data_frame_v1 = pd.read_csv(paths[0], delimiter="\t", index_col=False)
+        data_frame_v2 = pd.read_csv(paths[1], delimiter="\t", index_col=False)
+
+        print("\n\n" + drug + "'s phenotype CUI's\n")
+
+        print("v1: ")
+        print(data_frame_v1.cui[:top_data])
+
+        print("\n\nv2: ")
+        print(data_frame_v2.cui[:top_data])
+        print("\n")
+
+
+# Exports all the analyses to a .xlsx
+def export_data(drug_list):
+    for drug in drug_list:
+        # Drug phenotypes
+
+        paths = [read_paths()[0], read_paths()[1]]
+        paths[0] = paths[0][
+                   :-7] + "results/pathfx_analysis/" + drug + "/" + drug + "_merged_neighborhood__assoc_table_.txt"
+        paths[1] = paths[1][
+                   :-7] + "results/pathfx_analysis/" + drug + "/" + drug + "_merged_neighborhood__assoc_table_.txt"
+
+        data_frame_v1 = pd.read_csv(paths[0], delimiter="\t", index_col=False)
+        data_frame_v2 = pd.read_csv(paths[1], delimiter="\t", index_col=False)
+
+        data_frame_v1.__delitem__('rank')
+        data_frame_v2.__delitem__('rank')
+        data_frame_v1.__delitem__('Unnamed: 8')
+        data_frame_v2.__delitem__('Unnamed: 8')
+
+        diffs = cui_diffs(drug, print_stuff=False)
+
+        diffs[0].__delitem__('rank_x')
+        diffs[1].__delitem__('rank_x')
+        diffs[0].__delitem__('_merge')
+        diffs[1].__delitem__('_merge')
+        diffs[2].__delitem__('rank_x')
+
+        genes = prepare_genes(drug)
+
+        with pd.ExcelWriter("results/" + drug + ".xlsx") as writer:
+            data_frame_v1.to_excel(writer, sheet_name=drug + " all CUI's v1", index=0)
+            data_frame_v2.to_excel(writer, sheet_name=drug + " all CUI's v2", index=0)
+            diffs[0]['cui'].to_excel(writer, sheet_name=drug + " unique CUI's v1", index=0)
+            diffs[1]['cui'].to_excel(writer, sheet_name=drug + " unique CUI's v2", index=0)
+            diffs[2]['cui'].to_excel(writer, sheet_name=drug + " common CUI's", index=0)
+            genes[0].to_excel(writer, sheet_name=drug + " all genes v1")
+            genes[1].to_excel(writer, sheet_name=drug + " all genes v2")
+            genes[2]['Gene'].to_excel(writer, sheet_name=drug + " unique genes v1", index=0)
+            genes[3]['Gene'].to_excel(writer, sheet_name=drug + " unique genes v2", index=0)
+            genes[4]['Gene'].to_excel(writer, sheet_name=drug + " common genes", index=0)
 
 
 # Returns how many more genes v2 identified than v1
@@ -124,6 +257,9 @@ def compare_one_drug(v1db, v2db, drug_list, print_stuff=True):
 
         # Print top 10 most common data points if only comparing one drug
         if len(drug_list) == 1:
+
+            cui_diffs(drug_list[0])
+
             if args.compare_specific_phenotypes is None:
                 print("\nv1 top 10 most common phenotypes\n")
                 print(data_frame_v1['phenotype'].value_counts()[:top_data])
@@ -139,19 +275,28 @@ def compare_one_drug(v1db, v2db, drug_list, print_stuff=True):
                 for phen in args.compare_specific_phenotypes:
                     try:
                         print(phen + ": " + str(data_frame_v1['phenotype'].value_counts()[phen.lower()]))
-                    # Data point doesn't exist
+                    # Data point doesn't exist for the phenotype
                     except KeyError:
-                        print(phen + ": 0")
+                        # Try counting assuming CUI
+                        try:
+                            print(phen + ": " + str(data_frame_v1['cui'].value_counts()[phen.upper()]))
+                        except KeyError:
+                            # Key doesn't exist
+                            print(phen + ": 0")
 
                 # v2 results next
                 print("\n\nPathFXv2:")
                 for phen in args.compare_specific_phenotypes:
                     try:
                         print(phen + ": " + str(data_frame_v2['phenotype'].value_counts()[phen.lower()]))
-                    # Data point doesn't exist
+                    # Data point doesn't exist for the phenotype
                     except KeyError:
-                        print(phen + ": 0")
-                # v2 results next
+                        # Try counting assuming CUI
+                        try:
+                            print(phen + ": " + str(data_frame_v2['cui'].value_counts()[phen.upper()]))
+                        except KeyError:
+                            # Key doesn't exist
+                            print(phen + ": 0")
                 print("\n")
 
     # Genes
@@ -165,6 +310,7 @@ def compare_one_drug(v1db, v2db, drug_list, print_stuff=True):
 
         # Print top 10 most common data points
         if len(drug_list) == 1:
+            cui_diffs(drug_list[0])
             print("\nv1 top 10 most common genes\n")
             print(data_frame_v1['Gene'].value_counts()[:top_data])
             print("\n\nv2 top 10 most common genes\n")
@@ -268,6 +414,11 @@ def read_paths():
     if [locs[0].strip(), locs[1].strip()] == ["", ""]:
         return read_paths()
 
+    # Create results folder to hold spreadsheets
+    if not Path('results').is_dir():
+        os.mkdir('results')
+
+
     return [locs[0].strip(), locs[1].strip()]
 
 
@@ -324,29 +475,24 @@ def compare_n_drugs(num_of_drugs=-1, drug_list=None, compare_with_phen=False, co
     pkl_v1 = open(drug_db_path_v1, 'rb')
     pkl_v2 = open(drug_db_path_v2, 'rb')
 
-    drub_db_dict_v1 = pickle.load(pkl_v1)
+    drug_db_dict_v1 = pickle.load(pkl_v1)
 
     # Remove keys that have no data. Only needs to be done for one dict because the intersection is of both DB's
     # are taken after.
-    filtered = {k: v for k, v in drub_db_dict_v1.items() if len(v) is not 0}
-    drub_db_dict_v1.clear()
-    drub_db_dict_v1.update(filtered)
+    filtered = {k: v for k, v in drug_db_dict_v1.items() if len(v) is not 0}
+    drug_db_dict_v1.clear()
+    drug_db_dict_v1.update(filtered)
 
-    drug_db_list_v1 = drub_db_dict_v1.keys()
+    drug_db_list_v1 = drug_db_dict_v1.keys()
     drug_db_list_v2 = list(pickle.load(pkl_v2))
 
+    # Take intersection of both databases
     drug_db_merged = list(set(drug_db_list_v1) & set(drug_db_list_v2))
 
-    # Sanitize names
-    drug_db_merged = [drug_in_list for drug_in_list in drug_db_merged if "/" not in drug_in_list]
-    drug_db_merged = [drug_in_list for drug_in_list in drug_db_merged if "[" not in drug_in_list]
-    drug_db_merged = [drug_in_list for drug_in_list in drug_db_merged if "]" not in drug_in_list]
-    drug_db_merged = [drug_in_list for drug_in_list in drug_db_merged if "(" not in drug_in_list]
-    drug_db_merged = [drug_in_list for drug_in_list in drug_db_merged if ")" not in drug_in_list]
+    drug_db_validation = list(set(drug_db_list_v1) & set(drug_db_list_v2))
 
-    for drug in drug_db_merged:
-        if "/" in drug:
-            print(drug)
+    # only randomly select DB ID's
+    drug_db_merged = [drug_in_list for drug_in_list in drug_db_merged if drug_in_list[0:2] == "DB"]
 
     if len(drug_list) == 0:
         # Select n drugs randomly
@@ -358,7 +504,7 @@ def compare_n_drugs(num_of_drugs=-1, drug_list=None, compare_with_phen=False, co
     # Validate passed in drug list
     else:
         for drug in drug_list:
-            if drug.upper() not in map(str.upper, drug_db_merged):
+            if drug.upper() not in map(str.upper, drug_db_validation):
                 print(drug + " is not a valid drug.")
                 sys.exit(1)
         num_of_drugs = len(drug_list)
@@ -384,6 +530,12 @@ def compare_n_drugs(num_of_drugs=-1, drug_list=None, compare_with_phen=False, co
     # Set working dir back to original dir
     os.chdir(ogwd)
 
+    # Print CUIS
+    print_cuis(drug_list)
+
+    # outputs data to a spreadsheet
+    export_data(drug_list)
+
     # Compares the output depending on the commandline argument
     if compare_with_phen or args.compare_specific_phenotypes is not None:
         gene_diff = compare_with_phenotypes(drug_list, paths)
@@ -405,6 +557,7 @@ def compare_n_drugs(num_of_drugs=-1, drug_list=None, compare_with_phen=False, co
 
     # Just one drug, so say how much more data v2 found
     if len(drug_list) == 1:
+
         print("\nPathFX v2 identified " + str(gene_diff) + output_comparison + " for the drug: " + str(drug_names) +
               "\n")
         return gene_diff
