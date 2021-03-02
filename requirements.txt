@@ -16,6 +16,7 @@ jupyter==1.0.0
 jupyter-client==5.2.3
 jupyter-console==5.2.0
 jupyter-core==4.4.0
+setuptools==45
 MarkupSafe==1.0
 matplotlib==2.0.2
 mistune==0.8.3
@@ -49,3 +50,4 @@ traitlets==4.3.2
 wcwidth==0.1.7
 webencodings==0.5.1
 widgetsnbextension==3.1.4
+openpyxl==3.0.6
