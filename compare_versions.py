@@ -28,6 +28,10 @@ command_group_optional_args.add_argument('-r', '--random-drugs', metavar="n", ty
 command_group_optional_args_analysis.add_argument('-p', '--phenotypes', help='Compares PathFX using the amount of '
                                                                              'phenotypes it identifies',
                                                   action='store_true')
+command_group_optional_args_analysis.add_argument('-do', '--dropouts', help='Count which drugs have no results in v1 or '
+                                                                             'none in v2. Uses computed .xlsx in the'
+                                                                             ' results folder',
+                                                  action='store_true')
 command_group_optional_args_analysis.add_argument('-gwp', '--genes-with-phenotype',
                                                   help='Compares PathFX using only genes that have an associated '
                                                        'phenotype', action='store_true')
@@ -174,7 +178,7 @@ def export_data(drug_list):
 
         genes = prepare_genes(drug)
 
-        with pd.ExcelWriter("results/" + drug + ".xlsx") as writer:
+        with pd.ExcelWriter("results/" + drug + ".xls") as writer:
             data_frame_v1.to_excel(writer, sheet_name=drug + " all CUI's v1", index=0)
             data_frame_v2.to_excel(writer, sheet_name=drug + " all CUI's v2", index=0)
             diffs[0]['cui'].to_excel(writer, sheet_name=drug + " unique CUI's v1", index=0)
@@ -479,9 +483,9 @@ def compare_n_drugs(num_of_drugs=-1, drug_list=None, compare_with_phen=False, co
 
     # Remove keys that have no data. Only needs to be done for one dict because the intersection is of both DB's
     # are taken after.
-    filtered = {k: v for k, v in drug_db_dict_v1.items() if len(v) is not 0}
-    drug_db_dict_v1.clear()
-    drug_db_dict_v1.update(filtered)
+   # filtered = {k: v for k, v in drug_db_dict_v1.items() if len(v) is not 0}
+   # drug_db_dict_v1.clear()
+   # drug_db_dict_v1.update(filtered)
 
     drug_db_list_v1 = drug_db_dict_v1.keys()
     drug_db_list_v2 = list(pickle.load(pkl_v2))
@@ -489,10 +493,14 @@ def compare_n_drugs(num_of_drugs=-1, drug_list=None, compare_with_phen=False, co
     # Take intersection of both databases
     drug_db_merged = list(set(drug_db_list_v1) & set(drug_db_list_v2))
 
+
+
     drug_db_validation = list(set(drug_db_list_v1) & set(drug_db_list_v2))
 
     # only randomly select DB ID's
     drug_db_merged = [drug_in_list for drug_in_list in drug_db_merged if drug_in_list[0:2] == "DB"]
+
+    print("total drugs: " + str(len(drug_db_merged)))
 
     if len(drug_list) == 0:
         # Select n drugs randomly
@@ -618,6 +626,49 @@ def compare_with_genes_with_phenotypes(drug_list, paths):
 
     return gene_diff
 
+
+def check_dropouts():
+    files = os.listdir("results")
+    nothing_in_v1 = 0
+    nothing_in_v2 = 0
+    nothing_in_both = 0
+    v1_drugs = []
+    v2_drugs = []
+    both_drugs = []
+    count = 0
+
+    for file in files:
+        if (".xls" in file) and ("~" not in file[0:1]):
+            count += 1
+            sheet_v1 = pd.read_excel(os.getcwd() + "/results/" + file, sheetname=0)
+            sheet_v2 = pd.read_excel(os.getcwd() + "/results/" + file, sheetname=1)
+
+            # Amount of rows in sheet
+            v1 = sheet_v1.shape[0]
+            v2 = sheet_v2.shape[0]
+
+            if v1 == 0 and v2 == 0:
+                nothing_in_both += 1
+                both_drugs.append(file)
+            elif v1 == 0 and v2 != 0:
+                nothing_in_v1 += 1
+                v1_drugs.append(file)
+            elif v1 != 0 and v2 == 0:
+                nothing_in_v2 += 1
+                v2_drugs.append(file)
+
+    print("\nDrugs with empty data in both: " + str(nothing_in_both) + ". " + str(both_drugs))
+    print("\nDrugs with only empty data in v1: " + str(nothing_in_v1) + ". " + str(v1_drugs))
+    print("\nDrugs with only empty data in in v2: " + str(nothing_in_v2) + ". " + str(v2_drugs))
+    print("\nThere were " + str(count) + " files in your results folder")
+    print("\n\n")
+
+
+
+
+
+if args.dropouts:
+    check_dropouts()
 
 if args.random_drugs:
     compare_n_drugs(num_of_drugs=args.random_drugs, compare_with_phen=args.phenotypes,
