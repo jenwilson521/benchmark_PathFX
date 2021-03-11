@@ -664,9 +664,6 @@ def check_dropouts():
     print("\n\n")
 
 
-
-
-
 if args.dropouts:
     check_dropouts()
 
