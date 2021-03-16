@@ -470,10 +470,10 @@ def compare_n_drugs(num_of_drugs=-1, drug_list=None, compare_with_phen=False, co
     paths = read_paths()
 
     # Path to database of all drugs for v1
-    drug_db_path_v1 = paths[0][0:len(paths) - 10] + "/rscs/drug_intome_targets.pkl"
+    drug_db_path_v1 = paths[0][0:len(paths) - 10] + "/rscs/drugs_to_drugbank_targets.pkl"
 
     # Path to database of all drugs for v2
-    drug_db_path_v2 = paths[1][0:len(paths) - 10] + "/rscs/drug_intome_targets.pkl"
+    drug_db_path_v2 = paths[1][0:len(paths) - 10] + "/rscs/drugs_to_drugbank_targets.pkl"
     # Read into data frame with pandas
 
     pkl_v1 = open(drug_db_path_v1, 'rb')
@@ -483,17 +483,16 @@ def compare_n_drugs(num_of_drugs=-1, drug_list=None, compare_with_phen=False, co
 
     # Remove keys that have no data. Only needs to be done for one dict because the intersection is of both DB's
     # are taken after.
-   # filtered = {k: v for k, v in drug_db_dict_v1.items() if len(v) is not 0}
-   # drug_db_dict_v1.clear()
-   # drug_db_dict_v1.update(filtered)
+    # filtered = {k: v for k, v in drug_db_dict_v1.items() if len(v) is not 0}
+    # drug_db_dict_v1.clear()
+    # drug_db_dict_v1.update(filtered)
 
     drug_db_list_v1 = drug_db_dict_v1.keys()
-    drug_db_list_v2 = list(pickle.load(pkl_v2))
+    v2_with_targets = pickle.load(pkl_v2)
+    drug_db_list_v2 = list(v2_with_targets)
 
     # Take intersection of both databases
     drug_db_merged = list(set(drug_db_list_v1) & set(drug_db_list_v2))
-
-
 
     drug_db_validation = list(set(drug_db_list_v1) & set(drug_db_list_v2))
 
