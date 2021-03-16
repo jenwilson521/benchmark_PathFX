@@ -5,7 +5,7 @@ A repository for code comparing PathFX outputs between versions, and eventually 
 
 # Setup
 
-Uses the same environment as [PathFX](https://github.com/jenwilson521/PathFX), but with openpyxl added so that the data can be exported to spreadsheets.
+Uses the same environment as [PathFX](https://github.com/jenwilson521/PathFX), but with xlrd and xlwt added so that the data can be exported and read to/from .xls spreadsheets.
 
 Create a python 3.6 virtual environment (E.g. `conda create --name pathfxenv python=3.6`), activate it (`conda activate pathfxenv`), and then use `pip3 install -r requirements.txt` to install the required dependencies. Tested on miniconda 4.9.2.
 
