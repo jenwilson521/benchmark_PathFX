@@ -11,7 +11,7 @@ Create a python 3.6 virtual environment (E.g. `conda create --name pathfxenv pyt
 
 # Usage
 
-Running the script with no arguments or -h will give an overview of each of the arguments. The first time you run the script it will ask for paths to v1 and v2 of [PathFX](https://github.com/jenwilson521/PathFX). To get version 1.0 and 2.0 clone the respective branches.
+Running the script with no arguments or -h will give an overview of each of the arguments. The first time you run the script it will ask for paths to v1 and v2 of [PathFX](https://github.com/jenwilson521/PathFX). To get version 1.0 and 2.0 clone the respective branches. Whenever a test is ran it prints that specific test's output to the terminal window, and compiles all the tests to a .xls in the results folder next to the compare_versions.py. The spreadsheets in the results folder are used for calculating the droupouts.
 
 ### Compare specific drugs (--drugs)
 
@@ -40,6 +40,12 @@ To compare a single drug while looking at specific phenotypes use --compare-spec
 
 Example with `python compare_versions.py -d metformin -csp "lipoprotein(a)"`: 
 ![comparing PathFX looking only at lipoprotein(a) identification](readme_images/csp.png)
+
+## Compare dropouts (--dropouts)
+
+Uses the calculated data in the results folder to see if CUI's are only in version one or version two of PathFX. 
+
+![Example output of --dropouts](readme_images/dropouts.png)
 
 ### Compare different data
 
