@@ -9,6 +9,24 @@ import pickle
 from random import sample
 import shutil
 from pathlib import Path
+import numpy as np
+
+import matplotlib as mpl
+
+mpl.use('TkAgg')
+from matplotlib import backend_bases
+import matplotlib.pyplot as plt
+
+# Remove extraneous buttons on plots
+backend_bases.NavigationToolbar2.toolitems = (
+    (None, None, None, None),
+    (None, None, None, None),
+    (None, None, None, None),
+    (None, None, None, None),
+    (None, None, None, None),
+    (None, None, None, None),
+    (None, None, None, None),
+)
 
 print("\n")
 
@@ -28,9 +46,10 @@ command_group_optional_args.add_argument('-r', '--random-drugs', metavar="n", ty
 command_group_optional_args_analysis.add_argument('-p', '--phenotypes', help='Compares PathFX using the amount of '
                                                                              'phenotypes it identifies',
                                                   action='store_true')
-command_group_optional_args_analysis.add_argument('-do', '--dropouts', help='Count which drugs have no results in v1 or '
-                                                                             'none in v2. Uses computed .xlsx in the'
-                                                                             ' results folder',
+command_group_optional_args_analysis.add_argument('-do', '--dropouts',
+                                                  help='Count which drugs have no results in v1 or '
+                                                       'none in v2. Uses computed .xlsx in the'
+                                                       ' results folder',
                                                   action='store_true')
 command_group_optional_args_analysis.add_argument('-gwp', '--genes-with-phenotype',
                                                   help='Compares PathFX using only genes that have an associated '
@@ -46,6 +65,14 @@ parser.add_argument('-c', '--cache', help='Use already completed analysis if a p
 parser.add_argument('-t', '--top-amount', metavar="num", type=int,
                     help='Number of output items to display. Defaults to 10. Use when only '
                          'comparing one drug')
+
+# Arguments for plotting
+
+command_group_optional_args_analysis.add_argument('-pchart', '--single-drug-corrected-p-chart',
+                                                  help='Creates a bar chart'
+                                                       ' of phenotype corrected p-values of "before" and "after" '
+                                                       'for one drug.',
+                                                  type=str, nargs=1, metavar="drug")
 
 if len(sys.argv) == 1:
     parser.print_help(sys.stderr)
@@ -73,8 +100,10 @@ def cui_diffs(drug, print_stuff=True):
 
     data_intersection = pd.merge(data_frame_v1, data_frame_v2, how="inner", on=['cui'])
 
-    data_only_v1 = data_frame_v1.merge(data_frame_v2, indicator=True, how='left', on='cui').loc[lambda x: x['_merge'] != 'both']
-    data_only_v2 = data_frame_v2.merge(data_frame_v1, indicator=True, how='left', on='cui').loc[lambda x: x['_merge'] != 'both']
+    data_only_v1 = data_frame_v1.merge(data_frame_v2, indicator=True, how='left', on='cui').loc[
+        lambda x: x['_merge'] != 'both']
+    data_only_v2 = data_frame_v2.merge(data_frame_v1, indicator=True, how='left', on='cui').loc[
+        lambda x: x['_merge'] != 'both']
 
     data_only_v1 = data_only_v1.reset_index(drop=True)
     data_only_v2 = data_only_v2.reset_index(drop=True)
@@ -422,7 +451,6 @@ def read_paths():
     if not Path('results').is_dir():
         os.mkdir('results')
 
-
     return [locs[0].strip(), locs[1].strip()]
 
 
@@ -564,7 +592,6 @@ def compare_n_drugs(num_of_drugs=-1, drug_list=None, compare_with_phen=False, co
 
     # Just one drug, so say how much more data v2 found
     if len(drug_list) == 1:
-
         print("\nPathFX v2 identified " + str(gene_diff) + output_comparison + " for the drug: " + str(drug_names) +
               "\n")
         return gene_diff
@@ -626,6 +653,57 @@ def compare_with_genes_with_phenotypes(drug_list, paths):
     return gene_diff
 
 
+def create_p_bar_chart(drug):
+    files = os.listdir("results")
+
+    print(files)
+
+    if drug + ".xls" in files:
+
+        sheet_v1 = pd.read_excel(os.getcwd() + "/results/" + drug + ".xls", sheetname=0)
+        sheet_v2 = pd.read_excel(os.getcwd() + "/results/" + drug + ".xls", sheetname=1)
+
+        sheet_v1 = sheet_v1.sort_values("probability")
+        sheet_v2 = sheet_v2.sort_values("probability")
+
+        s1 = pd.merge(sheet_v2, sheet_v1, how='inner', on=['cui'])
+
+        s1 = s1.head(10)
+
+        df = pd.DataFrame({"Version 1": s1['probability_y'], "Version 2": s1['probability_x']})
+        ax = df.plot.barh(color=["SkyBlue", "IndianRed"], title=drug + "'s phenotype CUI probabilities",
+                          figsize=(15, 10))
+
+        ax.set_xlabel("Benjamini-Hochberg adjusted P-value")
+
+        ax.set_yticklabels(s1['cui'])
+
+        plt.xticks(rotation=90)
+        plt.yticks(rotation=0)
+
+        ax.set_ylabel("Phenotype CUI")
+
+        plt.gca().invert_yaxis()
+
+        plt.legend(bbox_to_anchor=(0, 1, 1, 0), loc="lower right")
+
+        rects = ax.patches
+
+        for rect in rects:
+            width = rect.get_width()
+            plt.text(rect.get_width(), rect.get_y() + 0.5 * rect.get_height(),
+                     " " + "{:.3e}".format(width),
+                     ha='left', va='center')
+
+        plt.tight_layout(h_pad=1.0,  w_pad=0.5)
+
+        plt.subplots_adjust(top=.9, right=.95)
+
+        plt.margins(0.1)
+
+        plt.show()
+
+
 def check_dropouts():
     files = os.listdir("results")
     nothing_in_v1 = 0
@@ -666,9 +744,21 @@ def check_dropouts():
 if args.dropouts:
     check_dropouts()
 
-if args.random_drugs:
+elif args.random_drugs:
     compare_n_drugs(num_of_drugs=args.random_drugs, compare_with_phen=args.phenotypes,
                     compare_gwp=args.genes_with_phenotype)
 elif args.drugs:
     compare_n_drugs(drug_list=args.drugs, compare_with_phen=args.phenotypes,
                     compare_gwp=args.genes_with_phenotype)
+
+elif args.single_drug_corrected_p_chart:
+    # Make sure data exists for the selected drug
+
+    cwd = os.getcwd()
+
+    run_analysis_v1(read_paths(), args.single_drug_corrected_p_chart[0])
+    run_analysis_v2(read_paths(), args.single_drug_corrected_p_chart[0])
+
+    os.chdir(cwd)
+
+    create_p_bar_chart(args.single_drug_corrected_p_chart[0])
